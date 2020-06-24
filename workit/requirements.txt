@@ -1,0 +1,205 @@
+ABOUT WORKIT
+--------------------------------------------------------------------------
+Workit integrates JIT, JIRA and Piervantage to create a simple integrated
+tracking solution for tickets
+
+General Tools
+-----------------
+workit list provides a useful list of tickets in various ways
+workit show provides details about a ticket and its checkins
+
+Developer Usage
+-----------------
+Start working on a ticket, the developer enters at command line:  
+workit switch -t task
+
+To update a ticket that some work has been completed, the developer can
+workit code -h hours -m "message"
+or
+workit finish -h hours -m "message"
+
+Code Review Tools
+-----------------
+workit review
+walks a lead through a code review process, handling branching and merging and jira updates
+
+workit deploy 
+deploys a selection of tickets staged in workit review
+
+WORKIT CONFIGURATION ELEMENTS
+--------------------------------------------------------------------------
+TicketTrack : {
+	Jira : {
+		Url: "url",
+		User: "username",
+		Password: "password",
+		InProgress: "In Progress step Name",
+		CodeReview: "Code Review step Name",
+		Deploy: "Deploy step Name",
+		Deployed: "Deployed step Name",
+	}
+}
+
+Git : {
+	origin: "Origin",
+	defaultBaseBranch: "release"
+}
+
+TimeEntry : {
+	PierVantage : {
+		Url: "url",
+		User: "username",
+		Password: "password",
+		TaskId: pv taskid
+		Opcode: pv opcode
+		Workorder:  pv workorder
+	}
+}
+
+WORKIT COMMAND DETAILS
+--------------------------------------------------------------------------
+COMMAND:	workit switch -t JIRATASK
+SYNOPSIS:	initiates work on the project
+STEPS:
+			jira	get_task	JIRATASK
+			git		get_branch	JIRATASK
+			jira	set_task	JIRATASK InProgress
+			jira	check_estimate
+
+COMMAND:	workit show -t JIRATASK
+SYNOPSIS:   shows synopsis of JIRA TASK along with any git history for that task
+			displays links to JIRA, GitHub
+			jira	get_task	JIRATASK
+			git		show_log	JIRATASK
+
+COMMAND:	workit code -h hours -m "message"
+SYNOPSIS:	logs work on JIRATASK, records work and time, puts the changes in the JIRA work log
+STEPS:
+			let commit = git		commit -a -m "JIRATASK"
+			let changes = git		show_commit
+			git		pull 
+			git		merge		defaultBaseBranch
+			git		push
+			jira	add_work	JIRATASK, Hours, message + changes
+			pv		log_time	JIRATASK+message
+
+COMMAND:	workit finish -h hours -m "message"
+SYNOPSIS:	logs work on JIRATASK, records work and time, puts the changes in the JIRA work log
+STEPS:
+			workit code -h hours -m "message"
+			jira	set_step	CodeReview
+
+COMMAND:	workit list [-tL JIRATASK... JIRATASK] [-l JIRALEVEL] [-s JIRASPRINT] [-a JIRASSIGNEE] [-v]
+SYNOPSIS:	provides a list of JIRATASKS, showing, the task name, the last time it was worked, filtering by -l the JIRALEVEL - Code Review, QA, In Progress
+STEPS:		
+			jira list [options]
+			if (verbose) {
+				show work items
+			}
+
+COMMAND:	workit review deploymentbranch
+SYNOPSIS:	pulls a list of tickets in code review in JIRA, shows changes and prompts for pass or fail and review time on each
+STEPS:		
+			let deploymentstagebranch = deploymentbranch+'stage'
+			git checkout deploymentstagebranch
+			git merge deploymentbranch
+
+			let list = workit list -l "CodeReview"
+			for each list {
+				workit show -t list.JIRATASK (this will show code changes)
+				while reviewing {
+					prompt (a) show again, (c) checkins, (d) deploy, (r) rework, (s) skip, (q) quit
+					switch prompt {
+						case 's'
+							continue to next task
+						case 'a'
+							workit show -t list.JIRATASK (this will show code changes)
+						case 'c'
+							git checkins JIRATASK (should not be necessary but handy)
+						case 'r'
+							jira settask 'JIRATASK' 'In Progress'
+						case 'd'
+							git checkout JIRATASK
+							git pull
+							git merge deploymentstagebranch
+							if (conflicts) 
+							{
+								git checkout deploymnentstagebranch
+								git merge	deploymentstagebranch
+							} 
+							else 
+							{
+								git push
+								git checkout deploymentstagebranch
+								git merge
+								jira settask 'JIRATASK' 'Deploy'
+							}
+						}
+					}
+				}
+			}
+
+COMMAND:	workit deploy -b deploymentbranch -tL JIRATASK..JIRATASK
+SYNOPSIS:	pulls the set of tickets into the deploymentbranch
+STEPS:		
+			let deploymentstagebranch = deploymentbranch+'stage'
+			git checkout deploymentstagebranch
+			git merge deploymentbranch
+			if conflicts STOP
+			git push
+			git checkout deploymentbranch
+			git merge deploymentstagebranch
+			git push
+
+WORKIT ROUTINES
+--------------------------------------------------------------------------
+browser jira JIRATASK
+		shows JIRATASK in browser 
+
+JIRA	check_estimate JIRATASK
+		checks if an estimate exists in JIRA
+		yes, proceed
+		no, prompt for estimated hours and update JIRATASK with estimate
+
+JIRA	check_task JIRATASK
+		checks if a task exists in JIRA
+
+JIRA	get_task	JIRATASK 
+		Shows description of JIRA task
+
+JIRA	set_task	JIRATASK  JIRASTATE
+		sets the task status to JIRASTATE 
+
+JIRA	add_work	JIRATASK, hours, comment
+		adds a work item entry to JIRA ticket
+	
+GIT		get_branch  JIRATASK  BASEBRANCH		 
+		Attempts to get branch. If the branch does not exist, it is created
+		git checkout -b JIRATASK
+
+		git checkout BASEBRANCH
+		(if it fails STOP)
+		git checkout -b JIRATASK 
+		(if it fails, do git checkout JIRATASK)
+		git merge BASEBRANCH
+
+GIT		merge		JIRATASK      
+
+BASE ROUTINES
+-------------
+Git Invoke
+There's a couple of ways to do this.  Probably the most reliable is to call Git and parse the output.
+The core routine would take:
+an object representing git arguments
+assemble the command line
+return the output as a list of strings
+
+Jira Invoke
+There's an atlassian jira interface.  There is a JIRA c# sdk, not sure how good it is. Atlassian has a 
+decently documented API. For the core, we could use the HttpPost methods that we created for LP
+
+PV Invoke
+PV's internal API is basically SOAP that uses a json payload instead of XML.  Requests are generally POST,
+and it is necessary in some cases to include dotnet binding information in the JSON tags as part of the 
+request.  The easiest way to get PV invocation information is to walk through the browser trace of 
+doing time entry.
