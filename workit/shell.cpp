@@ -17,7 +17,8 @@ bool shell::review(const char* branch)
 	g.commit(g.fast_development_branch, "merge");
 	g.push();
 
-	g.diff(g.fast_development_branch);
+	g.checkout(g.fast_development_branch);
+	g.diff(branch);
 
 	reviewed[branch] = true;
 
