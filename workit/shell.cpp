@@ -12,11 +12,10 @@ bool shell::review(const char* branch)
 		return false;
 
 	g.pull();
-	if (g.merge(g.fast_development_branch)) {
-		if (g.commit(g.fast_development_branch, "merge")) {
-			g.push();
-		}
-	}
+
+	g.merge(g.fast_development_branch);
+	g.commit(g.fast_development_branch, "merge");
+	g.push();
 
 	g.diff(g.fast_development_branch);
 
@@ -104,12 +103,15 @@ bool shell::run()
 			param = input.substr(2);
 		}
 		switch (command) {
+		case 'R':
 		case 'r':
 			review(param.c_str());
 			break;
+		case 'P':
 		case 'p':
 			promote(param.c_str());
 			break;
+		case 'F':
 		case 'f':
 			find(param.c_str());
 			break;
