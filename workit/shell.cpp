@@ -11,20 +11,14 @@ bool shell::review(const char* branch)
 	if (!g.checkout(branch))
 		return false;
 
-	if (!g.pull())
-		return false;
+	g.pull();
+	if (g.merge(g.fast_development_branch)) {
+		if (g.commit(g.fast_development_branch, "merge")) {
+			g.push();
+		}
+	}
 
-	if (!g.merge(g.fast_development_branch))
-		return false;
-
-	if (!g.commit(g.fast_development_branch, "merge"))
-		return false;
-
-	if (!g.push())
-		return false;
-
-	if (!g.diff(g.fast_development_branch))
-		return false;
+	g.diff(g.fast_development_branch);
 
 	reviewed[branch] = true;
 
@@ -42,14 +36,11 @@ bool shell::promote(const char* branch)
 	if (!g.checkout(g.fast_development_branch))
 		return false;
 
-	if (!g.merge(branch))
-		return false;
-
-	if (!g.commit(g.fast_development_branch, "merge"))
-		return false;
-
-	if (!g.push())
-		return false;
+	if (g.merge(branch)) {
+		if (g.commit(g.fast_development_branch, "merge")) {
+			g.push();
+		}
+	}
 
 	return true;
 }
@@ -133,4 +124,5 @@ bool shell::run()
 			return false;
 		}
 	}
+	return true;
 }
