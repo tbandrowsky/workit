@@ -15,12 +15,20 @@ bool shell::review(const char* branch)
 
 	g.merge(g.fast_development_branch);
 	g.commit(g.fast_development_branch, "merge");
-	g.push();
 
-	g.checkout(g.fast_development_branch);
-	g.diff(branch);
+	std::cout << R"([y]es, merge good, [n]o, merge bad)" << std::endl;
+	std::cout << ">";
 
-	reviewed[branch] = true;
+	std::string input;
+	std::getline(std::cin, input);
+
+	if (input.size() > 0 && input[0]=='y') {
+		std::cout << "pushing merge..." << std::endl;
+		g.push();
+		g.checkout(g.fast_development_branch);
+		g.diff(branch);
+		reviewed[branch] = true;
+	}
 
 	return true;
 }
